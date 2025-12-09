@@ -30,3 +30,11 @@ class MobileNetV3Encoder(nn.Module):
         x5 = self.stage5(x4)
 
         return x1, x2, x3, x4, x5
+
+
+if __name__ == '__main__':
+    base = models.mobilenet_v3_small(
+            weights=models.MobileNet_V3_Small_Weights.IMAGENET1K_V1
+        )
+    for name, layer in base.features.named_children():
+        print(name, layer)

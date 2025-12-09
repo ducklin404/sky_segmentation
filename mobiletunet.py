@@ -9,6 +9,8 @@ class MobileUNetLite(nn.Module):
 
         self.encoder = MobileNetV3Encoder(pretrained=True)
 
+        # start up sample to get the mask
+        # here we use 4 only to keep the model small and fast enough
         self.up4 = UpBlock(576, 96, 256)
         self.up3 = UpBlock(256, 40, 128)
         self.up2 = UpBlock(128, 24, 64)
