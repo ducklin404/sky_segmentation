@@ -4,13 +4,14 @@ import torch.nn as nn
 
 # lite U-net style block
 class UpBlock(nn.Module):
-    def __init__(self, in_ch, skip_ch, out_ch):
+    def __init__(self, in_ch, skip_ch, out_ch, scale=2):
         super().__init__()
-        # upsample the data
-        self.up = nn.ConvTranspose2d(in_ch, out_ch, kernel_size=2, stride=2)
-        
-        # merge the skip data
-        # padding to keep the same spatial size!
+        self.up = nn.ConvTranspose2d(
+            in_ch, out_ch,
+            kernel_size=scale,
+            stride=scale
+        )
+
         self.conv = nn.Sequential(
             nn.Conv2d(out_ch + skip_ch, out_ch, 3, padding=1),
             nn.BatchNorm2d(out_ch),
@@ -20,7 +21,7 @@ class UpBlock(nn.Module):
             nn.ReLU(inplace=True),
         )
 
-    def forward(self, x, skip):
+    def forward(self, x: torch.Tensor, skip: torch.Tensor):
         x = self.up(x)
         x = torch.cat([x, skip], dim=1)
         return self.conv(x)

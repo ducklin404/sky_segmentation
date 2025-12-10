@@ -55,7 +55,7 @@ def train_one_epoch(model: MobileUNetLite, loader, optimizer, device, loss_fn, s
 
         # mixed precision branch
         if scaler is not None:
-            with torch.amp.autocast():
+            with torch.amp.autocast(device_type=device):
                 loss = loss_fn(logits, masks)
             scaler.scale(loss).backward()
             scaler.step(optimizer)
@@ -142,7 +142,7 @@ def run_training(
     val_loader = DataLoader(val_dataset, batch_size=batch_size,
                             shuffle=False, num_workers=4, pin_memory=True)
 
-    scaler = torch.amp.GradScaler() if (use_amp and device.type == 'cuda') else None
+    scaler = torch.amp.GradScaler(device=device) if (use_amp and device.type == 'cuda') else None
 
     best_val_iou = -1.0
     print(
