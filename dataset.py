@@ -3,6 +3,7 @@ import cv2
 import torch
 from torch.utils.data import Dataset
 import numpy as np
+import pickle
 
 # Dataset
 class SkyPatchDataset(Dataset):
@@ -14,16 +15,25 @@ class SkyPatchDataset(Dataset):
         output_scale=2,
         resize_short=2240,
         stride=112,
-        min_fg_ratio=0.01
+        min_fg_ratio=0.01,
+        cache_file=None
     ):
-        # init everything and get all images/masks
         self.image_dir = image_dir
         self.mask_dir = mask_dir
         self.img_size = img_size
         self.out_size = img_size // output_scale
         self.stride = stride
         self.min_fg_ratio = min_fg_ratio
+        self.resize_short = resize_short
 
+        # use cache file if possible
+        if cache_file is not None and os.path.exists(cache_file):
+            print(f"Loading dataset cache: {cache_file}")
+            with open(cache_file, "rb") as f:
+                self.samples = pickle.load(f)
+            return
+
+        # build it norammmly if no cache file
         self.samples = []
 
         image_files = sorted(os.listdir(image_dir))
@@ -43,7 +53,6 @@ class SkyPatchDataset(Dataset):
             mask = cv2.resize(mask, (new_w, new_h),
                               interpolation=cv2.INTER_NEAREST)
 
-            # generate patches
             for y in range(0, new_h - img_size + 1, stride):
                 for x in range(0, new_w - img_size + 1, stride):
                     m_patch = mask[y:y+img_size, x:x+img_size]
@@ -51,12 +60,14 @@ class SkyPatchDataset(Dataset):
                     sky_ratio = (m_patch == 0).mean()
                     nonsky_ratio = (m_patch == 1).mean()
 
-                    # keep:
-                    # - sky only
-                    # - non-sky only
-                    # - mixed
                     if (sky_ratio > min_fg_ratio or nonsky_ratio > min_fg_ratio):
                         self.samples.append((img_path, mask_path, x, y, scale))
+
+        # save cache 
+        if cache_file is not None:
+            with open(cache_file, "wb") as f:
+                pickle.dump(self.samples, f)
+            print(f"Saved dataset cache: {cache_file}")
 
     def __len__(self):
         return len(self.samples)
