@@ -54,14 +54,10 @@ class SkyPatchDataset(Dataset):
             self._save_pickle()
 
         self.n_images = len(self.image_files)
-        if self.n_images == 0:
-            self.__len__ = lambda: 0
-        else:
-            self.__len__ = lambda: self.n_images * self.patches_per_image
+
 
     def __len__(self):
-        # overridden above
-        return max(0, getattr(self, "n_images", 0) * getattr(self, "patches_per_image", 0))
+        return self.n_images * self.patches_per_image
     
     def _build_file_list(self):
         file_list = []

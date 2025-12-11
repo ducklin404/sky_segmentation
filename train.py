@@ -30,6 +30,59 @@ def compute_iou(pred_logits, mask, thresh=0.5, eps=1e-7):
 def save_ckpt(state, path):
     torch.save(state, path)
 
+def estimate_pos_weight(dataset, max_samples=2000, batch_size=16, num_workers=2, sample_by_images=False, device='cpu'):
+    """
+    pos_weight = neg_pixels / pos_pixels (clamped to >= 1.0)
+
+    dataset: instance of SkyPatchDataset (returns img_patch, mask_patch)
+    max_samples: approximate number of patches to sample (not pixels)
+    batch_size, num_workers: DataLoader settings
+    sample_by_images: if True, sample patches by creating indices that ensure we sample across different images
+
+    """
+    if len(dataset) == 0:
+        return 1.0
+
+    # shuffle=True ensures random sampling of indices.
+    loader = DataLoader(
+        dataset,
+        batch_size=batch_size,
+        shuffle=True,
+        num_workers=num_workers,
+        pin_memory=True
+    )
+
+    total_pos = 0
+    total_neg = 0
+    seen = 0
+    max_batches = max(1, max_samples // batch_size)
+
+    with torch.no_grad():
+        for i, (imgs, masks) in enumerate(loader):
+            if device.startswith('cuda') and torch.cuda.is_available():
+                masks = masks.to(device, non_blocking=True)
+
+            # flatten and count ones/zeros per batch
+            batch_pos = int(masks.sum().item())
+            batch_pixels = masks.numel()
+            batch_neg = batch_pixels - batch_pos
+
+            total_pos += batch_pos
+            total_neg += batch_neg
+
+            seen += masks.size(0)
+            # stop after processed roughly max_samples patches
+            if (i + 1) >= max_batches:
+                break
+
+    # fallback if no positive pixels observed
+    if total_pos == 0:
+        return 1.0
+
+    pos_weight = float(total_neg / (total_pos + 1e-6))
+    return max(1.0, pos_weight)
+
+
 # training functions
 
 
@@ -232,25 +285,7 @@ if __name__ == "__main__":
     
     print("prepared ds")
 
-    # compute frequency over a subset to avoid long scan
-    def estimate_pos_weight(dataset, max_samples=2000):
-        loader = DataLoader(dataset, batch_size=16,
-                            shuffle=True, num_workers=2)
-        total_pos = 0
-        total_neg = 0
-        seen = 0
-        for imgs, masks in loader:
-            masks = masks.view(-1)
-            total_pos += (masks == 1).sum().item()
-            total_neg += (masks == 0).sum().item()
-            seen += 1
-            if seen > max_samples // 16:
-                break
-        if total_pos == 0:
-            return 1.0
-        return max(1.0, total_neg / (total_pos + 1e-6))
-
-    # hardcode
+     # hardcode
     est_pw = estimate_pos_weight(train_ds)
     # est_pw = 1.0
     print("Estimated pos_weight (neg/pos):", est_pw)
