@@ -55,7 +55,7 @@ def train_one_epoch(model: MobileUNetLite, loader, optimizer, device, loss_fn, s
 
         # mixed precision branch
         if scaler is not None:
-            with torch.amp.autocast(device_type=device):
+            with torch.amp.autocast(device_type=device.type):
                 loss = loss_fn(logits, masks)
             scaler.scale(loss).backward()
             scaler.step(optimizer)
@@ -99,7 +99,7 @@ def run_training(
     train_dataset,
     val_dataset,
     model: MobileUNetLite,
-    device='cuda',
+    device_str='cuda',
     batch_size=16,
     freeze_epochs=10,
     unfreeze_epochs=20,
@@ -115,7 +115,7 @@ def run_training(
     # second phase to fine tune both (unfreeze the encoder)
 
     os.makedirs(checkpoint_dir, exist_ok=True)
-    device = torch.device(device if torch.cuda.is_available() else 'cpu')
+    device = torch.device(device_str if torch.cuda.is_available() else 'cpu')
     model = model.to(device)
 
     # loss: BCEWithLogits expects logits; pos_weight vector adjusts for class imbalance
@@ -142,7 +142,7 @@ def run_training(
     val_loader = DataLoader(val_dataset, batch_size=batch_size,
                             shuffle=False, num_workers=4, pin_memory=True)
 
-    scaler = torch.amp.GradScaler(device=device) if (use_amp and device.type == 'cuda') else None
+    scaler = torch.amp.GradScaler(device=device_str) if (use_amp and device.type == 'cuda') else None
 
     best_val_iou = -1.0
     print(
@@ -197,18 +197,22 @@ def run_training(
 
 
 if __name__ == "__main__":
+    print("start")
     # paths
-    train_img_dir = "dataset/train/images"
-    train_mask_dir = "dataset/train/labels"
-    val_img_dir = "dataset/val/images"
-    val_mask_dir = "dataset/val/labels"
-    test_img_dir ="dataset/test/images"
-    test_mask_dir = "dataset/test/labels"
+    train_img_dir = "dataset/train/cache_resized/images"
+    train_mask_dir = "dataset/train/cache_resized/labels"
+
+    val_img_dir = "dataset/val/cache_resized/images"
+    val_mask_dir = "dataset/val/cache_resized/labels"
+
+    test_img_dir = "dataset/test/cache_resized/images"
+    test_mask_dir = "dataset/test/cache_resized/labels"
 
     # instantiate dataset 
     train_ds = SkyPatchDataset(
         train_img_dir,
         train_mask_dir,
+        resize_short=1024,
         img_size=224,
         stride=112,
         cache_file="train_cache.pkl"
@@ -217,6 +221,7 @@ if __name__ == "__main__":
     val_ds = SkyPatchDataset(
         val_img_dir,
         val_mask_dir,
+        resize_short=1024,
         img_size=224,
         stride=112,
         cache_file="val_cache.pkl"
@@ -225,6 +230,7 @@ if __name__ == "__main__":
     test_ds = SkyPatchDataset(
         test_img_dir,
         test_mask_dir,
+        resize_short=1024,
         img_size=224,
         stride=112,
         cache_file="test_cache.pkl"
@@ -248,7 +254,9 @@ if __name__ == "__main__":
             return 1.0
         return max(1.0, total_neg / (total_pos + 1e-6))
 
-    est_pw = estimate_pos_weight(train_ds)
+    # hardcode
+    # est_pw = estimate_pos_weight(train_ds)
+    est_pw = 1.0
     print("Estimated pos_weight (neg/pos):", est_pw)
 
     # model
@@ -258,7 +266,7 @@ if __name__ == "__main__":
         train_dataset=train_ds,
         val_dataset=val_ds,
         model=model,
-        device='cuda',
+        device_str='cuda',
         batch_size=16,
         freeze_epochs=8,
         unfreeze_epochs=20,
