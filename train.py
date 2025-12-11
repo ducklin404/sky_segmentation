@@ -213,18 +213,14 @@ if __name__ == "__main__":
         train_img_dir,
         train_mask_dir,
         resize_short=1024,
-        img_size=224,
-        stride=112,
-        cache_file="train_cache.pkl"
+        img_size=224
         )
 
     val_ds = SkyPatchDataset(
         val_img_dir,
         val_mask_dir,
         resize_short=1024,
-        img_size=224,
-        stride=112,
-        cache_file="val_cache.pkl"
+        img_size=224
     )
     
     test_ds = SkyPatchDataset(
@@ -232,9 +228,9 @@ if __name__ == "__main__":
         test_mask_dir,
         resize_short=1024,
         img_size=224,
-        stride=112,
-        cache_file="test_cache.pkl"
     )
+    
+    print("prepared ds")
 
     # compute frequency over a subset to avoid long scan
     def estimate_pos_weight(dataset, max_samples=2000):
@@ -255,8 +251,8 @@ if __name__ == "__main__":
         return max(1.0, total_neg / (total_pos + 1e-6))
 
     # hardcode
-    # est_pw = estimate_pos_weight(train_ds)
-    est_pw = 1.0
+    est_pw = estimate_pos_weight(train_ds)
+    # est_pw = 1.0
     print("Estimated pos_weight (neg/pos):", est_pw)
 
     # model
