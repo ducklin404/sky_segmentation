@@ -1,2 +1,3 @@
 torch==2.9.1+cu126
 torchvision==0.24.1+cu126
+onnxscript==0.5.6

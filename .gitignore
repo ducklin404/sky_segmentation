@@ -10,3 +10,4 @@ test*
 *.7z
 *.zip
 /cache
+/export
